@@ -1,0 +1,12 @@
+[package]
+name = "preference_opt"
+version = "0.1.0"
+authors = ["Renato <renato145@hotmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nalgebra = "0.25.3"
+thiserror = "1.0.24"
+anyhow = "1.0.38"
