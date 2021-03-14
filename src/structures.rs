@@ -1,6 +1,6 @@
 //! Main data structures
 
-use nalgebra::{DMatrix, MatrixXx2};
+use nalgebra::{DMatrix, Matrix2xX, MatrixXx2};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -32,7 +32,7 @@ impl DataSamples {
         }
 
         let x = x.into_iter().flatten().collect();
-        let data = DMatrix::from_vec(rows, cols, x);
+        let data = DMatrix::from_vec(cols, rows, x).transpose();
         Ok(Self { data })
     }
 
@@ -66,13 +66,14 @@ impl DataPreferences {
     /// # Examples
     ///
     /// ```
-    /// # use preference_opt::DataPreferences;
+    /// # use preference_opt::datapreferences;
     /// let m = vec![(0, 1), (2, 3)];
     /// let m = DataPreferences::new(m);
     /// ```
     pub fn new(x: Vec<(usize, usize)>) -> Self {
         let x = x.into_iter().map(|(a, b)| vec![a, b]).flatten().collect();
-        let data = MatrixXx2::from_vec(x);
+        // let data = MatrixXx2::from_vec(x);
+        let data = Matrix2xX::from_vec(x).transpose();
         Self { data }
     }
 
@@ -89,6 +90,7 @@ impl DataPreferences {
         }
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;

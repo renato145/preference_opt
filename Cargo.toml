@@ -10,3 +10,8 @@ edition = "2018"
 nalgebra = "0.25.3"
 thiserror = "1.0.24"
 anyhow = "1.0.38"
+itertools = "0.10.0"
+statrs = "0.13.0"
+
+[dev-dependencies]
+approx = "0.4.0"
