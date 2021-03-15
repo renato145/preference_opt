@@ -66,7 +66,7 @@ impl DataPreferences {
     /// # Examples
     ///
     /// ```
-    /// # use preference_opt::datapreferences;
+    /// # use preference_opt::DataPreferences;
     /// let m = vec![(0, 1), (2, 3)];
     /// let m = DataPreferences::new(m);
     /// ```
@@ -80,6 +80,11 @@ impl DataPreferences {
     /// Get the highest index in the data.
     pub fn max(&self) -> usize {
         self.data.max()
+    }
+
+    /// Get the number of samples.
+    pub fn len(&self) -> usize {
+        self.data.nrows()
     }
 
     /// Prints the preferences

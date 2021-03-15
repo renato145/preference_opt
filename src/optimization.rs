@@ -130,12 +130,8 @@ impl PreferenceOpt {
         self.with_bounds(bounds)
     }
 
-    /// Index of the last preference (m).
-    fn m_last_idx(&self) -> usize {
-        self.m.data.nrows() - 1
-    }
-
     /// Optimizes the problem based on a function.
+    /// Returns (optimal_values, f_posterior)
     ///
     /// # Arguments
     ///
@@ -144,33 +140,67 @@ impl PreferenceOpt {
     /// * `f_prior` - Prior with mean zero is applied by default
     pub fn optimize_fn(
         &mut self,
-        _func: fn(&[f64]) -> f64,
+        func: fn(&[f64]) -> f64,
         max_iters: usize,
         f_prior: Option<Vec<f64>>,
         n_init: usize,
         n_solve: usize,
-    ) -> Result<()> {
-        let m_last_idx = self.m_last_idx();
+    ) -> Result<(RowDVector<f64>, DVector<f64>)> {
+        let mut x = self.x.data.clone();
+        let mut m = self.m.data.clone();
+        let n = x.nrows();
+        let f_prior = f_prior.map(|o| o.clone()).unwrap_or(vec![0f64; n]);
+        let mut f_prior = DVector::from_vec(f_prior);
+        let m_last_idx = m.nrows() - 1;
         for m_ind_cpt in m_last_idx..(m_last_idx + max_iters) {
-            self.fit(f_prior.as_ref())?;
+            self.x.data = x.clone();
+            self.fit(&x, &f_prior)?;
             let x_optim = self.bayesopt(n_init, n_solve);
-            // x_optim = self.bayesopt(bounds, method, n_init, n_solve)
+            let x_optim = DMatrix::from_rows(&[x_optim]);
+            let f_optim = self.predict(&x_optim, false).0;
+            let _f_prior = self.posterior.clone().unwrap();
+            let n = _f_prior.nrows();
+            f_prior = _f_prior.insert_row(n, f_optim[0]);
+            let n = x.nrows();
+            x = x.insert_row(n, 0.0);
+            x_optim
+                .row(0)
+                .iter()
+                .enumerate()
+                .for_each(|(i, &o)| x[(n, i)] = o);
+
+            //  current preference index in X
+            let m_ind_current = m[(m.nrows() - 1, 0)];
+            // suggestion index in X
+            let m_ind_proposal = m_ind_cpt + 2;
+            let proposal = func(&x.row(m_ind_proposal).iter().map(|&o| o).collect::<Vec<_>>());
+            let current = func(&x.row(m_ind_current).iter().map(|&o| o).collect::<Vec<_>>());
+            let new_pair = if current < proposal {
+                (m_ind_proposal, m_ind_current)
+            } else {
+                (m_ind_current, m_ind_proposal)
+            };
+            let n = m.nrows();
+            m = m.insert_row(n, 0);
+            m[(n, 0)] = new_pair.0;
+            m[(n, 1)] = new_pair.1;
         }
-        // let row = self.x.data.row(0).iter().cloned().collect::<Vec<_>>();
-        // let res = func(&row);
-        // println!("{}", res);
-        Ok(())
+
+        let idx = m[(m.nrows() - 1, 0)];
+        let optimal_values = x.row(idx).clone_owned();
+        let f_posterior = f_prior;
+        self.x.data = x;
+        self.m.data = m;
+
+        Ok((optimal_values, f_posterior))
     }
 
     /// Fit a Gaussian process probit regression model.
-    fn fit(&mut self, f_prior: Option<&Vec<f64>>) -> Result<()> {
+    fn fit(&mut self, x: &DMatrix<f64>, f_prior: &DVector<f64>) -> Result<()> {
         // compute quantities required for prediction
-        let mut k = self.kernel.apply(&self.x.data, None);
+        let mut k = self.kernel.apply(x, None);
         k.set_diagonal(&k.diagonal().add_scalar(self.alpha));
-        let n = k.nrows();
         self.l_ = Some(k.cholesky().ok_or(OptError::CholeskyNotFound)?);
-        let f_prior = f_prior.map(|o| o.clone()).unwrap_or(vec![0f64; n]);
-        let f_prior = DVector::from_vec(f_prior);
 
         // compute the posterior distribution of f
         self.posterior = Some(self.post_approx.apply(
@@ -303,8 +333,11 @@ mod tests {
         let mut opt =
             PreferenceOpt::from_data(samples, preferences)?.with_same_bounds((0.0, 10.0))?;
         let func = |o: &[f64]| o.iter().sum();
-        opt.optimize_fn(func, 1, None, 10, 3)?;
-        // println!("{}", opt.posterior.unwrap());
+        let (optimal_values, f_posterior) = opt.optimize_fn(func, 2, None, 10, 3)?;
+        println!("optimal_values -> {}", optimal_values);
+        println!("f_posterior -> {}", f_posterior);
+        opt.x.show();
+        opt.m.show();
         Ok(())
     }
 }
