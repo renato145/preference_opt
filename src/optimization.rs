@@ -142,15 +142,14 @@ impl PreferenceOpt {
         &mut self,
         func: fn(&[f64]) -> f64,
         max_iters: usize,
-        f_prior: Option<Vec<f64>>,
+        f_prior: Option<DVector<f64>>,
         n_init: usize,
         n_solve: usize,
     ) -> Result<(RowDVector<f64>, DVector<f64>)> {
         let mut x = self.x.data.clone();
         let mut m = self.m.data.clone();
         let n = x.nrows();
-        let f_prior = f_prior.map(|o| o.clone()).unwrap_or(vec![0f64; n]);
-        let mut f_prior = DVector::from_vec(f_prior);
+        let mut f_prior = f_prior.map(|o| o.clone()).unwrap_or(DVector::zeros(n));
         let m_last_idx = m.nrows() - 1;
         for m_ind_cpt in m_last_idx..(m_last_idx + max_iters) {
             self.x.data = x.clone();
@@ -334,6 +333,11 @@ mod tests {
             PreferenceOpt::from_data(samples, preferences)?.with_same_bounds((0.0, 10.0))?;
         let func = |o: &[f64]| o.iter().sum();
         let (optimal_values, f_posterior) = opt.optimize_fn(func, 2, None, 10, 3)?;
+        println!("optimal_values -> {}", optimal_values);
+        println!("f_posterior -> {}", f_posterior);
+        opt.x.show();
+        opt.m.show();
+        let (optimal_values, f_posterior) = opt.optimize_fn(func, 2, Some(f_posterior), 10, 3)?;
         println!("optimal_values -> {}", optimal_values);
         println!("f_posterior -> {}", f_posterior);
         opt.x.show();
