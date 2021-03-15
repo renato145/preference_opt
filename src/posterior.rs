@@ -44,7 +44,7 @@ impl Laplace {
         &self,
         f_prior: &DVector<f64>,
         m: &MatrixXx2<usize>,
-        k: Cholesky<f64, Dynamic>,
+        k: &Cholesky<f64, Dynamic>,
         distribution: &Normal,
     ) -> DVector<f64> {
         // Likelihood function of a preference relation
@@ -148,7 +148,7 @@ mod tests {
         let k = k.cholesky().unwrap();
         let post_approx = Laplace::default();
         let distribution = Normal::new(0.0, 1.0)?;
-        let res = post_approx.apply(&f_prior, &m.data, k, &distribution);
+        let res = post_approx.apply(&f_prior, &m.data, &k, &distribution);
         let expected = DVector::from_vec(vec![-0.56, 0.002, 0.56]);
         assert_abs_diff_eq!(res, expected, epsilon = 0.01);
         Ok(())

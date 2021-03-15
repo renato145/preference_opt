@@ -29,7 +29,7 @@ impl RBF {
                 let y = y / self.length_scale;
                 cdist(&x, &y)
             }
-            None => squareform(pdist(&x)),
+            None => pdist(&x),
         };
         for i in dist.iter_mut() {
             *i = (-0.5 * i.inlined_clone()).exp();
@@ -45,13 +45,17 @@ fn sqeuclidean_distance(a: &DVector<f64>, b: &DVector<f64>) -> f64 {
 }
 
 /// Pairwise distances between observations in n-dimensional space using the squared Euclidean distance.
-fn pdist(x: &DMatrix<f64>) -> DVector<f64> {
+fn pdist(x: &DMatrix<f64>) -> DMatrix<f64> {
+    if x.nrows() == 1 {
+        return DMatrix::from_element(1, 1, 1.0);
+    }
+
     let distances = (0..x.nrows())
         .combinations(2)
         .map(|idxs| sqeuclidean_distance(&x.row(idxs[0]).transpose(), &x.row(idxs[1]).transpose()))
         .collect::<Vec<_>>();
 
-    DVector::from_vec(distances)
+    squareform(DVector::from_vec(distances))
 }
 
 /// Compute distance between each pair of the two collections of inputs using the squared Euclidean distance.
@@ -104,7 +108,11 @@ mod tests {
         let x = vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.1, 0.2, 0.3];
         let x = DMatrix::from_vec(3, 4, x);
         let res = pdist(&x);
-        let expected = DVector::from_vec(vec![0.04, 0.16, 0.04]);
+        let expected = DMatrix::from_vec(
+            3,
+            3,
+            vec![0.0, 0.04, 0.16, 0.04, 0.0, 0.04, 0.16, 0.04, 0.0],
+        );
         assert_abs_diff_eq!(res, expected);
     }
 
@@ -148,12 +156,15 @@ mod tests {
 
     #[test]
     fn rbf_test() {
+        let kernel = RBF::default();
         let x = vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.1, 0.2, 0.3];
         let x = DMatrix::from_vec(3, 4, x);
-        let kernel = RBF::default();
         let res = kernel.apply(&x, None);
         let expected = vec![1.0, 0.98, 0.92, 0.98, 1.0, 0.98, 0.92, 0.98, 1.0];
         let expected = DMatrix::from_vec(3, 3, expected);
         assert_abs_diff_eq!(res, expected, epsilon = 0.01);
+        let x = DMatrix::from_vec(1, 2, vec![2.6, 2.3]);
+        let res = kernel.apply(&x, None);
+        assert_eq!(res.shape(), (1, 1));
     }
 }
