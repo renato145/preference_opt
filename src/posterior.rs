@@ -1,7 +1,7 @@
 //! Posterior approximation strategies
 
 use itertools::Itertools;
-use nalgebra::{Cholesky, DMatrix, DVector, Dynamic, Matrix, MatrixXx2, SliceStorage, U1, U2};
+use nalgebra::{Cholesky, DMatrix, DVector, Dynamic, MatrixXx2};
 use statrs::distribution::{Continuous, Normal, Univariate};
 
 /// Laplace approximation of the posterior distribution P(f|M) in a probit-preference gaussian regression model.
@@ -27,9 +27,6 @@ impl Default for Laplace {
         }
     }
 }
-
-pub type PreferenceSlice<'a, N, RStride = U1, CStride = Dynamic> =
-    Matrix<N, U1, U2, SliceStorage<'a, N, U1, U2, RStride, CStride>>;
 
 impl Laplace {
     /// Return the Laplace approximation of P(f|M).
