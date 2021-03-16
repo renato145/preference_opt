@@ -52,6 +52,10 @@ fn ask_user(
     }
 }
 
+fn row2vec(x: &DMatrix<f64>, row: usize) -> Vec<f64> {
+    x.row(row).iter().map(|&o| o).collect::<Vec<_>>()
+}
+
 #[derive(Debug)]
 pub struct PreferenceOpt {
     pub x: DataSamples,
@@ -202,6 +206,61 @@ impl PreferenceOpt {
         self.with_bounds(bounds)
     }
 
+    /// Get sample to test.
+    /// This is useful for implementing a manual optimization in conjuction with `add_preference`, be sure to keep track of `f_prior`.
+    /// Returns (sample1, index1, sample2, index2)
+    ///
+    /// # Arguments
+    ///
+    /// * `f_prior` - Prior with mean zero is applied by default
+    /// * `n_init` - Number of initialization points for the solver, obtained by randomly sampling the acquisition function
+    /// * `n_solve` - The solver will be run n_solve times (cannot be superior to n_init)
+    pub fn get_next_sample(
+        &mut self,
+        f_prior: Option<&Vec<f64>>,
+        n_init: usize,
+        n_solve: usize,
+    ) -> Result<(Vec<f64>, usize, Vec<f64>, usize)> {
+        self.init_samples();
+        if self.m.data.len() == 0 {
+            let row0 = row2vec(&self.x.data, 0);
+            let row1 = row2vec(&self.x.data, 1);
+            return Ok((row0, 0, row1, 1));
+        }
+
+        let mut x = self.x.data.clone();
+        let m = self.m.data.clone();
+        let n = x.nrows();
+        let mut f_prior = match f_prior {
+            Some(o) => DVector::from_vec(o.clone()),
+            None => DVector::zeros(n),
+        };
+        let m_ind_cpt = if m.nrows() > 0 { m.nrows() - 1 } else { 0 };
+        let (m_ind_current, m_ind_proposal) =
+            self.get_next_pair(&mut x, &m, &mut f_prior, m_ind_cpt, n_init, n_solve)?;
+        let current = row2vec(&x, m_ind_current);
+        let proposal = row2vec(&x, m_ind_proposal);
+        Ok((current, m_ind_current, proposal, m_ind_proposal))
+    }
+
+    /// Adds a preference to the data.
+    /// This is useful for implementing a manual optimization in conjuction with `get_next_sample`.
+    pub fn add_preference(&mut self, preference: usize, other: usize) -> Result<()> {
+        let mut m = self.m.data.clone();
+        let n = m.nrows();
+        m = m.insert_row(n, 0);
+        m[(n, 0)] = preference;
+        m[(n, 1)] = other;
+        self.m.data = m;
+        Ok(())
+    }
+
+    /// Get the optimal set of values.
+    pub fn get_optimal_values(&self) -> Vec<f64> {
+        let idx = self.m.data[(self.m.len() - 1, 0)];
+        row2vec(&self.x.data, idx)
+    }
+
     /// Bayesian optimization via preferences inputs.
     /// Returns (optimal_values, f_posterior)
     ///
@@ -221,15 +280,25 @@ impl PreferenceOpt {
     ) -> Result<(RowDVector<f64>, DVector<f64>)> {
         self.init_samples();
         let mut x = self.x.data.clone();
-        let mut m = self.m.data.clone();
+        let mut m = if self.m.len() == 0 {
+            let row0 = row2vec(&x, 0);
+            let row1 = row2vec(&x, 1);
+            let (a, b) = ask_user(row0, 0, row1, 1).unwrap();
+            let m = MatrixXx2::from_vec(vec![a, b]);
+            self.m.data = m.clone();
+            m
+        } else {
+            self.m.data.clone()
+        };
+
         let n = x.nrows();
         let mut f_prior = f_prior.map(|o| o.clone()).unwrap_or(DVector::zeros(n));
         let m_last_idx = if m.nrows() > 0 { m.nrows() - 1 } else { 0 };
         for m_ind_cpt in m_last_idx..(m_last_idx + max_iters) {
             let (m_ind_current, m_ind_proposal) =
                 self.get_next_pair(&mut x, &m, &mut f_prior, m_ind_cpt, n_init, n_solve)?;
-            let proposal = x.row(m_ind_proposal).iter().map(|&o| o).collect::<Vec<_>>();
-            let current = x.row(m_ind_current).iter().map(|&o| o).collect::<Vec<_>>();
+            let proposal = row2vec(&x, m_ind_proposal);
+            let current = row2vec(&x, m_ind_current);
             match ask_user(current, m_ind_current, proposal, m_ind_proposal) {
                 Some(new_pair) => {
                     let n = m.nrows();
@@ -271,8 +340,8 @@ impl PreferenceOpt {
         self.init_samples();
         let mut x = self.x.data.clone();
         let mut m = if self.m.len() == 0 {
-            let row0 = func(&x.row(0).iter().map(|&o| o).collect::<Vec<_>>());
-            let row1 = func(&x.row(1).iter().map(|&o| o).collect::<Vec<_>>());
+            let row0 = func(&row2vec(&x, 0));
+            let row1 = func(&row2vec(&x, 1));
             let m = if row0 < row1 {
                 MatrixXx2::from_vec(vec![1, 0])
             } else {
@@ -290,8 +359,8 @@ impl PreferenceOpt {
         for m_ind_cpt in m_last_idx..(m_last_idx + max_iters) {
             let (m_ind_current, m_ind_proposal) =
                 self.get_next_pair(&mut x, &m, &mut f_prior, m_ind_cpt, n_init, n_solve)?;
-            let proposal = func(&x.row(m_ind_proposal).iter().map(|&o| o).collect::<Vec<_>>());
-            let current = func(&x.row(m_ind_current).iter().map(|&o| o).collect::<Vec<_>>());
+            let proposal = func(&row2vec(&x, m_ind_proposal));
+            let current = func(&row2vec(&x, m_ind_current));
             let new_pair = if current < proposal {
                 (m_ind_proposal, m_ind_current)
             } else {
