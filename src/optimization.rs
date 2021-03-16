@@ -332,12 +332,25 @@ mod tests {
         let mut opt =
             PreferenceOpt::from_data(samples, preferences)?.with_same_bounds((0.0, 10.0))?;
         let func = |o: &[f64]| o.iter().sum();
-        let (optimal_values, f_posterior) = opt.optimize_fn(func, 2, None, 10, 3)?;
+        let (optimal_values, f_posterior) = opt.optimize_fn(func, 1, None, 1, 1)?;
         println!("optimal_values -> {}", optimal_values);
         println!("f_posterior -> {}", f_posterior);
         opt.x.show();
         opt.m.show();
-        let (optimal_values, f_posterior) = opt.optimize_fn(func, 2, Some(f_posterior), 10, 3)?;
+        let (optimal_values, f_posterior) = opt.optimize_fn(func, 1, Some(f_posterior), 1, 1)?;
+        println!("optimal_values -> {}", optimal_values);
+        println!("f_posterior -> {}", f_posterior);
+        opt.x.show();
+        opt.m.show();
+        let samples = vec![vec![1.0, 0.0, 7.0], vec![2.0, 5.0, 3.0]];
+        let preferences = vec![(1, 0)];
+        let mut opt = PreferenceOpt::from_data(samples, preferences)?.with_bounds(vec![
+            (0.0, 10.0),
+            (0.0, 5.0),
+            (0.0, 30.0),
+        ])?;
+        let func = |o: &[f64]| o.iter().sum();
+        let (optimal_values, f_posterior) = opt.optimize_fn(func, 3, None, 10, 3)?;
         println!("optimal_values -> {}", optimal_values);
         println!("f_posterior -> {}", f_posterior);
         opt.x.show();
