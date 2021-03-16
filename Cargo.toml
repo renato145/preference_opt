@@ -1,4 +1,5 @@
 [workspace]
 members = [
-    "preference_opt"
+    "preference_opt",
+    "preference-opt-wasm",
 ]
