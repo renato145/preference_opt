@@ -16,6 +16,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum OptError {
+    #[error("No samples given, try using `PreferenceOpt::new`")]
+    NoSamples,
     #[error("Invalid preference index: {0}")]
     InvalidPreference(usize),
     #[error("The problem have {dims} dimensions but {n_bounds} bounds where given")]
@@ -74,12 +76,41 @@ impl PreferenceOpt {
     ///
     /// ```
     /// # use preference_opt::PreferenceOpt;
+    /// let opt = PreferenceOpt::new(5);
+    /// ```
+    pub fn new(dims: usize) -> Self {
+        let x = DataSamples::new(dims);
+        let m = DataPreferences::new(vec![]);
+        Self {
+            x,
+            m,
+            bounds: None,
+            kernel: RBF::default(),
+            alpha: 1e-5,
+            posterior: None,
+            post_approx: Laplace::default(),
+            acquisition: ExpectedImprovement::default(),
+            distribution: Normal::new(0.0, 1.0).unwrap(),
+            l_: None,
+            distributions: None,
+        }
+    }
+
+    /// Creates a new optimization from data.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use preference_opt::PreferenceOpt;
     /// let x = vec![vec![0.0, 1.0], vec![4.0, 3.0], vec![2.0, 3.0]];
     /// let m = vec![(0, 1), (2, 0)];
     /// let opt = PreferenceOpt::from_data(x, m).unwrap();
     /// ```
     pub fn from_data(samples: Vec<Vec<f64>>, preferences: Vec<(usize, usize)>) -> Result<Self> {
-        let x = DataSamples::new(samples)?;
+        if samples.len() == 0 {
+            return Err(OptError::NoSamples.into());
+        }
+        let x = DataSamples::from_data(samples)?;
         let m = DataPreferences::new(preferences);
         if m.max() >= x.len() {
             return Err(OptError::InvalidPreference(m.max()).into());
@@ -102,6 +133,22 @@ impl PreferenceOpt {
     /// Get the number of dimensions to optimize.
     pub fn dims(&self) -> usize {
         self.x.data.ncols()
+    }
+
+    /// Prepare samples if the are less than
+    pub fn init_samples(&mut self) {
+        let n = self.x.len();
+        if n < 2 {
+            let rows2insert = 2 - n;
+            let x_append = self.random_sample(rows2insert);
+            let mut x = self.x.data.clone().insert_rows(n, rows2insert, 0.0);
+            for (i, row) in x_append.row_iter().enumerate() {
+                for (j, &o) in row.iter().enumerate() {
+                    x[(n + i, j)] = o;
+                }
+            }
+            self.x.data = x;
+        }
     }
 
     /// Define bounds for the optimization problem (inclusive bounds).
@@ -172,11 +219,12 @@ impl PreferenceOpt {
         n_init: usize,
         n_solve: usize,
     ) -> Result<(RowDVector<f64>, DVector<f64>)> {
+        self.init_samples();
         let mut x = self.x.data.clone();
         let mut m = self.m.data.clone();
         let n = x.nrows();
         let mut f_prior = f_prior.map(|o| o.clone()).unwrap_or(DVector::zeros(n));
-        let m_last_idx = m.nrows() - 1;
+        let m_last_idx = if m.nrows() > 0 { m.nrows() - 1 } else { 0 };
         for m_ind_cpt in m_last_idx..(m_last_idx + max_iters) {
             let (m_ind_current, m_ind_proposal) =
                 self.get_next_pair(&mut x, &m, &mut f_prior, m_ind_cpt, n_init, n_solve)?;
@@ -220,11 +268,25 @@ impl PreferenceOpt {
         n_init: usize,
         n_solve: usize,
     ) -> Result<(RowDVector<f64>, DVector<f64>)> {
+        self.init_samples();
         let mut x = self.x.data.clone();
-        let mut m = self.m.data.clone();
+        let mut m = if self.m.len() == 0 {
+            let row0 = func(&x.row(0).iter().map(|&o| o).collect::<Vec<_>>());
+            let row1 = func(&x.row(1).iter().map(|&o| o).collect::<Vec<_>>());
+            let m = if row0 < row1 {
+                MatrixXx2::from_vec(vec![1, 0])
+            } else {
+                MatrixXx2::from_vec(vec![0, 1])
+            };
+            self.m.data = m.clone();
+            m
+        } else {
+            self.m.data.clone()
+        };
+
         let n = x.nrows();
         let mut f_prior = f_prior.map(|o| o.clone()).unwrap_or(DVector::zeros(n));
-        let m_last_idx = m.nrows() - 1;
+        let m_last_idx = if m.nrows() > 0 { m.nrows() - 1 } else { 0 };
         for m_ind_cpt in m_last_idx..(m_last_idx + max_iters) {
             let (m_ind_current, m_ind_proposal) =
                 self.get_next_pair(&mut x, &m, &mut f_prior, m_ind_cpt, n_init, n_solve)?;
@@ -275,7 +337,6 @@ impl PreferenceOpt {
             .iter()
             .enumerate()
             .for_each(|(i, &o)| x[(n, i)] = o);
-
         // current preference index in X
         let m_ind_current = m[(m.nrows() - 1, 0)];
         // suggestion index in X
@@ -415,8 +476,16 @@ mod tests {
     }
 
     #[test]
+    fn init_samples() -> Result<()> {
+        let mut opt = PreferenceOpt::new(2).with_same_bounds((0.0, 10.0))?;
+        opt.init_samples();
+        println!("{}", opt.x.data);
+        Ok(())
+    }
+
+    #[test]
     fn optimize_fn_test() -> Result<()> {
-        let samples = vec![vec![1.0, 0.0], vec![2.0, 5.0]];
+        let samples = vec![vec![1.0, 3.0], vec![2.0, 5.0]];
         let preferences = vec![(1, 0)];
         let mut opt =
             PreferenceOpt::from_data(samples, preferences)?.with_same_bounds((0.0, 10.0))?;
@@ -447,18 +516,40 @@ mod tests {
         Ok(())
     }
 
-    // #[test]
-    // fn optimize_fn_empty_test() -> Result<()> {
-    //     let samples = vec![vec![1.0, 0.0], vec![2.0, 5.0]];
-    //     let preferences = vec![];
-    //     let mut opt =
-    //         PreferenceOpt::from_data(samples, preferences)?.with_same_bounds((0.0, 10.0))?;
-    //     let func = |o: &[f64]| o.iter().sum();
-    //     let (optimal_values, f_posterior) = opt.optimize_fn(func, 1, None, 1, 1)?;
-    //     println!("optimal_values -> {}", optimal_values);
-    //     println!("f_posterior -> {}", f_posterior);
-    //     opt.x.show();
-    //     opt.m.show();
-    //     Ok(())
-    // }
+    #[test]
+    fn optimize_fn_empty_preferences() -> Result<()> {
+        let samples = vec![vec![1.0, 3.0], vec![2.0, 5.0]];
+        let preferences = vec![];
+        let mut opt =
+            PreferenceOpt::from_data(samples, preferences)?.with_same_bounds((0.0, 10.0))?;
+        let func = |o: &[f64]| o.iter().sum();
+        let (optimal_values, f_posterior) = opt.optimize_fn(func, 1, None, 1, 1)?;
+        println!("optimal_values -> {}", optimal_values);
+        println!("f_posterior -> {}", f_posterior);
+        opt.x.show();
+        opt.m.show();
+        Ok(())
+    }
+
+    #[test]
+    fn optimize_fn_empty_samples() -> Result<()> {
+        let samples = vec![vec![1.0, 3.0]];
+        let preferences = vec![];
+        let mut opt =
+            PreferenceOpt::from_data(samples, preferences)?.with_same_bounds((0.0, 10.0))?;
+        let func = |o: &[f64]| o.iter().sum();
+        let (optimal_values, f_posterior) = opt.optimize_fn(func, 1, None, 1, 1)?;
+        println!("optimal_values -> {}", optimal_values);
+        println!("f_posterior -> {}", f_posterior);
+        opt.x.show();
+        opt.m.show();
+        let mut opt = PreferenceOpt::new(2).with_same_bounds((0.0, 10.0))?;
+        let func = |o: &[f64]| o.iter().sum();
+        let (optimal_values, f_posterior) = opt.optimize_fn(func, 1, None, 1, 1)?;
+        println!("optimal_values -> {}", optimal_values);
+        println!("f_posterior -> {}", f_posterior);
+        opt.x.show();
+        opt.m.show();
+        Ok(())
+    }
 }

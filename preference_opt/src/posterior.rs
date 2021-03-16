@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn laplace_test() -> Result<()> {
-        let x = DataSamples::new(vec![vec![1.0, 0.0], vec![2.0, 5.0], vec![3.5, 2.0]])?;
+        let x = DataSamples::from_data(vec![vec![1.0, 0.0], vec![2.0, 5.0], vec![3.5, 2.0]])?;
         let m = DataPreferences::new(vec![(1, 0), (2, 1)]);
         let kernel = RBF::default();
         let mut k = kernel.apply(&x.data, None);

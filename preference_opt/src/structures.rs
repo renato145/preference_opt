@@ -5,6 +5,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum DataError {
+    #[error("No samples given")]
+    NoSamples,
     #[error("Not all rows have size=={0}")]
     InvalidCols(usize),
 }
@@ -21,10 +23,28 @@ impl DataSamples {
     ///
     /// ```
     /// # use preference_opt::DataSamples;
-    /// let x = vec![vec![0.0, 1.0], vec![2.0, 3.0]];
-    /// let x = DataSamples::new(x).unwrap();
+    /// let x = DataSamples::new(4);
+    /// assert_eq!(x.data.shape(), (0, 4));
     /// ```
-    pub fn new(x: Vec<Vec<f64>>) -> Result<Self, DataError> {
+    pub fn new(dims: usize) -> Self {
+        let data = DMatrix::zeros(0, dims);
+        Self { data }
+    }
+
+    /// Creates a new example data structure.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use preference_opt::DataSamples;
+    /// let x = vec![vec![0.0, 1.0], vec![2.0, 3.0]];
+    /// let x = DataSamples::from_data(x).unwrap();
+    /// ```
+    pub fn from_data(x: Vec<Vec<f64>>) -> Result<Self, DataError> {
+        if x.len() == 0 {
+            return Err(DataError::NoSamples.into());
+        }
+
         let rows = x.len();
         let cols = x[0].len();
         if !x.iter().map(|row| row.len()).all(|o| o == cols) {
@@ -103,13 +123,13 @@ mod tests {
     #[should_panic]
     fn samples_creation_fail() {
         let x = vec![vec![0.0, 1.0], vec![2.0, 3.0, 4.0]];
-        DataSamples::new(x).unwrap();
+        DataSamples::from_data(x).unwrap();
     }
 
     #[test]
     fn samples_show() {
         let x = vec![vec![0.0, 1.2], vec![2.0, 3.0]];
-        let x = DataSamples::new(x).unwrap();
+        let x = DataSamples::from_data(x).unwrap();
         x.show();
     }
 
