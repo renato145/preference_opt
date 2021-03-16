@@ -1,4 +1,4 @@
-//! This repository will closely follow the implementation on [GPro].
+//! This repository closely follows the implementation on [GPro].
 //!
 //! [GPro]: https://github.com/chariff/GPro
 

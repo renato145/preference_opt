@@ -7,8 +7,9 @@ use crate::{
     DataPreferences, DataSamples,
 };
 use anyhow::Result;
+use dialoguer::{theme::ColorfulTheme, Select};
 use itertools::Itertools;
-use nalgebra::{Cholesky, DMatrix, DVector, Dynamic, RowDVector};
+use nalgebra::{Cholesky, DMatrix, DVector, Dynamic, MatrixXx2, RowDVector};
 use rand::{distributions::Uniform, prelude::Distribution};
 use statrs::distribution::Normal;
 use thiserror::Error;
@@ -23,6 +24,30 @@ pub enum OptError {
     InvalidBoundLimits { low: f64, high: f64 },
     #[error("The kernel is not returning a positive-definite matrix. Try gradually increasing the `alpha` parameter on PreferenceOpt")]
     CholeskyNotFound,
+}
+
+fn ask_user(
+    current: Vec<f64>,
+    current_idx: usize,
+    proposal: Vec<f64>,
+    proposal_idx: usize,
+) -> Option<(usize, usize)> {
+    let items = vec![
+        format!("Current best: {:.2?}", current),
+        format!("Proposal    : {:.2?}", proposal),
+        "Quit".into(),
+    ];
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .items(&items)
+        .default(0)
+        .interact()
+        .unwrap();
+
+    match selection {
+        0 => Some((current_idx, proposal_idx)),
+        1 => Some((proposal_idx, current_idx)),
+        _ => None,
+    }
 }
 
 #[derive(Debug)]
@@ -130,6 +155,53 @@ impl PreferenceOpt {
         self.with_bounds(bounds)
     }
 
+    /// Bayesian optimization via preferences inputs.
+    /// Returns (optimal_values, f_posterior)
+    ///
+    /// # Arguments
+    ///
+    /// * `func` - Function to optimize
+    /// * `max_iters` - Maximum number of iterations to be performed for the bayesian optimization
+    /// * `f_prior` - Prior with mean zero is applied by default
+    /// * `n_init` - Number of initialization points for the solver, obtained by randomly sampling the acquisition function
+    /// * `n_solve` - The solver will be run n_solve times (cannot be superior to n_init)
+    pub fn interactive_optimization(
+        &mut self,
+        max_iters: usize,
+        f_prior: Option<DVector<f64>>,
+        n_init: usize,
+        n_solve: usize,
+    ) -> Result<(RowDVector<f64>, DVector<f64>)> {
+        let mut x = self.x.data.clone();
+        let mut m = self.m.data.clone();
+        let n = x.nrows();
+        let mut f_prior = f_prior.map(|o| o.clone()).unwrap_or(DVector::zeros(n));
+        let m_last_idx = m.nrows() - 1;
+        for m_ind_cpt in m_last_idx..(m_last_idx + max_iters) {
+            let (m_ind_current, m_ind_proposal) =
+                self.get_next_pair(&mut x, &m, &mut f_prior, m_ind_cpt, n_init, n_solve)?;
+            let proposal = x.row(m_ind_proposal).iter().map(|&o| o).collect::<Vec<_>>();
+            let current = x.row(m_ind_current).iter().map(|&o| o).collect::<Vec<_>>();
+            match ask_user(current, m_ind_current, proposal, m_ind_proposal) {
+                Some(new_pair) => {
+                    let n = m.nrows();
+                    m = m.insert_row(n, 0);
+                    m[(n, 0)] = new_pair.0;
+                    m[(n, 1)] = new_pair.1;
+                }
+                None => break,
+            }
+        }
+
+        let idx = m[(m.nrows() - 1, 0)];
+        let optimal_values = x.row(idx).clone_owned();
+        let f_posterior = f_prior;
+        self.x.data = x;
+        self.m.data = m;
+
+        Ok((optimal_values, f_posterior))
+    }
+
     /// Optimizes the problem based on a function.
     /// Returns (optimal_values, f_posterior)
     ///
@@ -138,6 +210,8 @@ impl PreferenceOpt {
     /// * `func` - Function to optimize
     /// * `max_iters` - Maximum number of iterations to be performed for the bayesian optimization
     /// * `f_prior` - Prior with mean zero is applied by default
+    /// * `n_init` - Number of initialization points for the solver, obtained by randomly sampling the acquisition function
+    /// * `n_solve` - The solver will be run n_solve times (cannot be superior to n_init)
     pub fn optimize_fn(
         &mut self,
         func: fn(&[f64]) -> f64,
@@ -152,26 +226,8 @@ impl PreferenceOpt {
         let mut f_prior = f_prior.map(|o| o.clone()).unwrap_or(DVector::zeros(n));
         let m_last_idx = m.nrows() - 1;
         for m_ind_cpt in m_last_idx..(m_last_idx + max_iters) {
-            self.x.data = x.clone();
-            self.fit(&x, &f_prior)?;
-            let x_optim = self.bayesopt(n_init, n_solve);
-            let x_optim = DMatrix::from_rows(&[x_optim]);
-            let f_optim = self.predict(&x_optim, false).0;
-            let _f_prior = self.posterior.clone().unwrap();
-            let n = _f_prior.nrows();
-            f_prior = _f_prior.insert_row(n, f_optim[0]);
-            let n = x.nrows();
-            x = x.insert_row(n, 0.0);
-            x_optim
-                .row(0)
-                .iter()
-                .enumerate()
-                .for_each(|(i, &o)| x[(n, i)] = o);
-
-            //  current preference index in X
-            let m_ind_current = m[(m.nrows() - 1, 0)];
-            // suggestion index in X
-            let m_ind_proposal = m_ind_cpt + 2;
+            let (m_ind_current, m_ind_proposal) =
+                self.get_next_pair(&mut x, &m, &mut f_prior, m_ind_cpt, n_init, n_solve)?;
             let proposal = func(&x.row(m_ind_proposal).iter().map(|&o| o).collect::<Vec<_>>());
             let current = func(&x.row(m_ind_current).iter().map(|&o| o).collect::<Vec<_>>());
             let new_pair = if current < proposal {
@@ -192,6 +248,39 @@ impl PreferenceOpt {
         self.m.data = m;
 
         Ok((optimal_values, f_posterior))
+    }
+
+    /// Outputs the index of the current best sample and a proposal sample.
+    fn get_next_pair(
+        &mut self,
+        x: &mut DMatrix<f64>,
+        m: &MatrixXx2<usize>,
+        f_prior: &mut DVector<f64>,
+        m_ind_cpt: usize,
+        n_init: usize,
+        n_solve: usize,
+    ) -> Result<(usize, usize)> {
+        self.x.data = x.clone();
+        self.fit(x, f_prior)?;
+        let x_optim = self.bayesopt(n_init, n_solve);
+        let x_optim = DMatrix::from_rows(&[x_optim]);
+        let f_optim = self.predict(&x_optim, false).0;
+        let _f_prior = self.posterior.clone().unwrap();
+        let n = _f_prior.nrows();
+        *f_prior = _f_prior.insert_row(n, f_optim[0]);
+        let n = x.nrows();
+        *x = x.clone().insert_row(n, 0.0);
+        x_optim
+            .row(0)
+            .iter()
+            .enumerate()
+            .for_each(|(i, &o)| x[(n, i)] = o);
+
+        // current preference index in X
+        let m_ind_current = m[(m.nrows() - 1, 0)];
+        // suggestion index in X
+        let m_ind_proposal = m_ind_cpt + 2;
+        Ok((m_ind_current, m_ind_proposal))
     }
 
     /// Fit a Gaussian process probit regression model.
