@@ -208,7 +208,7 @@ impl PreferenceOpt {
 
     /// Get sample to test.
     /// This is useful for implementing a manual optimization in conjuction with `add_preference`, be sure to keep track of `f_prior`.
-    /// Returns (sample1, index1, sample2, index2)
+    /// Returns (sample1, index1, sample2, index2, f_prior)
     ///
     /// # Arguments
     ///
@@ -220,12 +220,12 @@ impl PreferenceOpt {
         f_prior: Option<&Vec<f64>>,
         n_init: usize,
         n_solve: usize,
-    ) -> Result<(Vec<f64>, usize, Vec<f64>, usize)> {
+    ) -> Result<(Vec<f64>, usize, Vec<f64>, usize, Option<Vec<f64>>)> {
         self.init_samples();
         if self.m.data.len() == 0 {
             let row0 = row2vec(&self.x.data, 0);
             let row1 = row2vec(&self.x.data, 1);
-            return Ok((row0, 0, row1, 1));
+            return Ok((row0, 0, row1, 1, None));
         }
 
         let mut x = self.x.data.clone();
@@ -240,19 +240,25 @@ impl PreferenceOpt {
             self.get_next_pair(&mut x, &m, &mut f_prior, m_ind_cpt, n_init, n_solve)?;
         let current = row2vec(&x, m_ind_current);
         let proposal = row2vec(&x, m_ind_proposal);
-        Ok((current, m_ind_current, proposal, m_ind_proposal))
+        let f_prior = f_prior.iter().map(|&o| o).collect::<Vec<_>>();
+        Ok((
+            current,
+            m_ind_current,
+            proposal,
+            m_ind_proposal,
+            Some(f_prior),
+        ))
     }
 
     /// Adds a preference to the data.
     /// This is useful for implementing a manual optimization in conjuction with `get_next_sample`.
-    pub fn add_preference(&mut self, preference: usize, other: usize) -> Result<()> {
+    pub fn add_preference(&mut self, preference: usize, other: usize) {
         let mut m = self.m.data.clone();
         let n = m.nrows();
         m = m.insert_row(n, 0);
         m[(n, 0)] = preference;
         m[(n, 1)] = other;
         self.m.data = m;
-        Ok(())
     }
 
     /// Get the optimal set of values.
@@ -619,6 +625,17 @@ mod tests {
         println!("f_posterior -> {}", f_posterior);
         opt.x.show();
         opt.m.show();
+        Ok(())
+    }
+
+    #[test]
+    fn manual_optimization() -> Result<()> {
+        let mut opt = PreferenceOpt::new(2).with_same_bounds((0.0, 10.0))?;
+        let _sample = opt.get_next_sample(None, 500, 1)?;
+        opt.add_preference(1, 0);
+        opt.x.show();
+        opt.m.show();
+        println!("{:?}", opt.get_optimal_values());
         Ok(())
     }
 }
