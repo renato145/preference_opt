@@ -1,23 +1,25 @@
 import React from "react";
 import { Intro } from "./components/Intro";
 import { SampleDataView } from "./components/SampleDataView";
-import { OptimizationState, TStore, useStore } from "./store";
+import { TState, TStore, useStore } from "./store";
 
-const selector = ({ optState }: TStore) => optState;
+const selector = ({ state, toogleHelp }: TStore) => ({ state, toogleHelp });
 
 export const App = () => {
-  const optState = useStore(selector);
+  const { state, toogleHelp } = useStore(selector);
 
   return (
-    <div className="container mx-auto px-20 py-5">
-      <p className="text-3xl font-extrabold text-center">Preference Optimization</p>
-      <div className="mt-10">
-        {optState === OptimizationState.Initial ? (
-          <Intro />
-        ) : (
-          <SampleDataView className="" />
-        )}
-      </div>
+    <div className="container mx-auto px-2 md:px-20 py-5">
+      <p className="text-3xl font-extrabold text-center">
+        Preference Optimization{" "}
+        {state !== TState.Initial ? (
+          <button className="btn-link text-lg" onClick={toogleHelp}>
+            (info)
+          </button>
+        ) : null}
+      </p>
+      <Intro className={ state === TState.Initial ? "mt-6 md:mt-12" : "mt-4"} />
+      <SampleDataView className="mt-10" />
     </div>
   );
 };

@@ -40,9 +40,4 @@
   .btn-lg {
     @apply px-6 py-2 text-lg;
   }
-
-  .input-text {
-    @apply rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-300 focus:ring-opacity-75;
-  }
 }
-

@@ -22,7 +22,7 @@ export const BestSampleView: React.FC<Props> = ({
         <SampleView className="mt-1" data={data} />
         {active && data !== undefined ? (
           <button className="mt-2 px-4 btn" onClick={saveCurrentBest}>
-            Select this sample
+            Keep this!
           </button>
         ) : null}
       </div>
