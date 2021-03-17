@@ -47,15 +47,10 @@ impl OptimizationEngine {
 
     pub fn get_next_sample(
         &mut self,
-        f_prior: Option<Vec<f64>>,
         n_init: usize,
         n_solve: usize,
+        f_prior: Option<Vec<f64>>,
     ) -> SampleData {
-        // let f_prior = if f_prior.len() == 0 {
-        //     None
-        // } else {
-        //     Some(&f_prior)
-        // };
         let (sample1, idx1, sample2, idx2, f_prior) = self
             .engine
             .get_next_sample(f_prior.as_ref(), n_init, n_solve)
@@ -119,9 +114,9 @@ mod tests {
         let mut opt = OptimizationEngine::new_empty(2).with_same_bounds(vec![0.0, 10.0]);
         opt.engine.x.show();
         opt.engine.m.show();
-        let sample = opt.get_next_sample(None, 500, 1);
+        let sample = opt.get_next_sample(500, 1, None);
         opt.add_preference(1, 0);
-        let _sample = opt.get_next_sample(sample.f_prior(), 500, 1);
+        let _sample = opt.get_next_sample(500, 1, sample.f_prior());
         opt.engine.x.show();
         opt.engine.m.show();
         println!("Optimal: {:?}", opt.get_optimal_values());

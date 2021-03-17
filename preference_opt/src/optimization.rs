@@ -241,6 +241,7 @@ impl PreferenceOpt {
         let current = row2vec(&x, m_ind_current);
         let proposal = row2vec(&x, m_ind_proposal);
         let f_prior = f_prior.iter().map(|&o| o).collect::<Vec<_>>();
+        self.x.data = x;
         Ok((
             current,
             m_ind_current,
@@ -303,8 +304,8 @@ impl PreferenceOpt {
         for m_ind_cpt in m_last_idx..(m_last_idx + max_iters) {
             let (m_ind_current, m_ind_proposal) =
                 self.get_next_pair(&mut x, &m, &mut f_prior, m_ind_cpt, n_init, n_solve)?;
-            let proposal = row2vec(&x, m_ind_proposal);
             let current = row2vec(&x, m_ind_current);
+            let proposal = row2vec(&x, m_ind_proposal);
             match ask_user(current, m_ind_current, proposal, m_ind_proposal) {
                 Some(new_pair) => {
                     let n = m.nrows();
@@ -365,8 +366,8 @@ impl PreferenceOpt {
         for m_ind_cpt in m_last_idx..(m_last_idx + max_iters) {
             let (m_ind_current, m_ind_proposal) =
                 self.get_next_pair(&mut x, &m, &mut f_prior, m_ind_cpt, n_init, n_solve)?;
-            let proposal = func(&row2vec(&x, m_ind_proposal));
             let current = func(&row2vec(&x, m_ind_current));
+            let proposal = func(&row2vec(&x, m_ind_proposal));
             let new_pair = if current < proposal {
                 (m_ind_proposal, m_ind_current)
             } else {
@@ -424,9 +425,11 @@ impl PreferenceOpt {
         // compute quantities required for prediction
         let mut k = self.kernel.apply(x, None);
         k.set_diagonal(&k.diagonal().add_scalar(self.alpha));
+        let kk = k.clone();
         self.l_ = Some(k.cholesky().ok_or(OptError::CholeskyNotFound)?);
 
         // compute the posterior distribution of f
+        println!("---> x={:?} k={:?} prior={:?} m={:?}", x.shape(), kk.shape(), f_prior.shape(), self.m.data.shape());
         self.posterior = Some(self.post_approx.apply(
             &f_prior,
             &self.m.data,
@@ -583,7 +586,7 @@ mod tests {
             (0.0, 30.0),
         ])?;
         let func = |o: &[f64]| o.iter().sum();
-        let (optimal_values, f_posterior) = opt.optimize_fn(func, 3, None, 10, 3)?;
+        let (optimal_values, f_posterior) = opt.optimize_fn(func, 10, None, 10, 3)?;
         println!("optimal_values -> {}", optimal_values);
         println!("f_posterior -> {}", f_posterior);
         opt.x.show();
@@ -630,9 +633,13 @@ mod tests {
 
     #[test]
     fn manual_optimization() -> Result<()> {
-        let mut opt = PreferenceOpt::new(2).with_same_bounds((0.0, 10.0))?;
-        let _sample = opt.get_next_sample(None, 500, 1)?;
-        opt.add_preference(1, 0);
+        let mut opt = PreferenceOpt::new(3).with_same_bounds((0.0, 10.0))?;
+        let (_, idx1, _, idx2, f_prior) = opt.get_next_sample(None, 500, 1)?;
+        opt.add_preference(idx1, idx2);
+        let (_, idx1, _, idx2, f_prior) = opt.get_next_sample(f_prior.as_ref(), 500, 1)?;
+        opt.add_preference(idx1, idx2);
+        let (_, idx1, _, idx2, _) = opt.get_next_sample(f_prior.as_ref(), 500, 1)?;
+        opt.add_preference(idx1, idx2);
         opt.x.show();
         opt.m.show();
         println!("{:?}", opt.get_optimal_values());
