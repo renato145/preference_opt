@@ -9,14 +9,15 @@ export const App = () => {
   const optState = useStore(selector);
 
   return (
-    <div className="p-20 text-xl">
-      {optState === OptimizationState.Initial ? (
-        <Intro />
-      ) : (
-        <div className="mt-4 p-4 max-w-max bg-blue-100">
-          <SampleDataView />
-        </div>
-      )}
+    <div className="container mx-auto px-20 py-5">
+      <p className="text-3xl font-extrabold text-center">Preference Optimization</p>
+      <div className="mt-10">
+        {optState === OptimizationState.Initial ? (
+          <Intro />
+        ) : (
+          <SampleDataView className="" />
+        )}
+      </div>
     </div>
   );
 };

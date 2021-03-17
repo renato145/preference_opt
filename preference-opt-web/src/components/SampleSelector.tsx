@@ -14,11 +14,11 @@ export const SampleSelector: React.FC<Props> = ({ idx, data, ...props }) => {
 
   return (
     <div {...props}>
-      <div className="flex space-x-4">
-        <p className="font-bold">Sample {idx}: </p>
-        <SampleView data={data} />
+      <div className="flex flex-col items-center">
+        <p className="text-xl font-bold">Sample {idx}</p>
+        <SampleView className="mt-1" data={data} />
         <button
-          className="btn-confirm btn-sm"
+          className="mt-2 px-4 btn"
           onClick={() => selectSample(idx)}
         >
           Select this sample

@@ -11,9 +11,14 @@ export const BestSampleView: React.FC<HTMLProps<HTMLDivElement>> = ({
 
   return (
     <div {...props}>
-      <div className="flex space-x-4">
-        <p className="font-bold">Best sample: </p>
-        {bestSample !== undefined ? <SampleView data={bestSample} /> : null}
+      <div className="flex flex-col items-center">
+        <p className="text-xl font-bold">Best sample</p>
+        {bestSample !== undefined ? (
+          <>
+            <SampleView className="mt-1" data={bestSample} />
+            <button className="mt-2 px-4 btn">Select this sample</button>
+          </>
+        ) : null}
       </div>
     </div>
   );

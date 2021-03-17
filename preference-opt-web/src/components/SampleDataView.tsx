@@ -13,15 +13,13 @@ export const SampleDataView: React.FC<HTMLProps<HTMLDivElement>> = ({
   return (
     <div {...props}>
       {data !== undefined ? (
-        <>
-          <SampleSelector idx={data.idx1} data={data.sample1()} />
-          <SampleSelector
-            className="mt-2"
-            idx={data.idx2}
-            data={data.sample2()}
-          />
-          <BestSampleView className="mt-4" />
-        </>
+        <div className="flex flex-col items-center">
+          <div className="flex justify-around">
+            <SampleSelector idx={data.idx1} data={data.sample1()} />
+            <SampleSelector className="ml-8" idx={data.idx2} data={data.sample2()} />
+          </div>
+          <BestSampleView className="mt-10" />
+        </div>
       ) : null}
     </div>
   );
