@@ -1,7 +1,6 @@
 import create from "zustand";
 import { OptimizationEngine, SampleData } from "preference-opt-wasm";
 
-/** Indicates the next action that should be done. */
 export enum OptimizationState {
   Initial,
   Running,
@@ -27,7 +26,7 @@ export const useStore = create<TStore>((set, get) => ({
   savedSamples: [],
   loadSampleData: () => {
     const sampleData = get().engine.get_next_sample(
-      500,
+      50,
       1,
       get().sampleData?.f_prior()
     );

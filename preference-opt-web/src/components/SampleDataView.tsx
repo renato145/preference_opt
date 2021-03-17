@@ -28,9 +28,9 @@ export const SampleDataView: React.FC<HTMLProps<HTMLDivElement>> = ({
           </div>
           <div className="mt-10 flex flex-wrap space-x-2">
             {savedSamples.map((data, i) => (
-              <BestSampleView key={i} data={data} title="asd" />
+              <BestSampleView key={i} data={data} />
             ))}
-            <BestSampleView data={bestSample} title="Best sample" active />
+            <BestSampleView data={bestSample} active />
           </div>
         </div>
       ) : null}

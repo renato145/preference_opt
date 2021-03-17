@@ -232,7 +232,7 @@ impl PreferenceOpt {
         let m = self.m.data.clone();
         let n = x.nrows();
         let mut f_prior = match f_prior {
-            Some(o) => DVector::from_vec(o.clone()),
+            Some(prior) => DVector::from_vec(prior.clone()),
             None => DVector::zeros(n),
         };
         let m_ind_cpt = if m.nrows() > 0 { m.nrows() - 1 } else { 0 };
