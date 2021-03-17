@@ -1,7 +1,7 @@
 {
   "name": "preference-opt-web",
   "version": "0.1.0",
-  "homepage": "https://renato145.github.io/preference_opt/",
+  "homepage": ".",
   "private": true,
   "dependencies": {
     "@craco/craco": "^6.1.1",
