@@ -425,11 +425,9 @@ impl PreferenceOpt {
         // compute quantities required for prediction
         let mut k = self.kernel.apply(x, None);
         k.set_diagonal(&k.diagonal().add_scalar(self.alpha));
-        let kk = k.clone();
         self.l_ = Some(k.cholesky().ok_or(OptError::CholeskyNotFound)?);
 
         // compute the posterior distribution of f
-        println!("---> x={:?} k={:?} prior={:?} m={:?}", x.shape(), kk.shape(), f_prior.shape(), self.m.data.shape());
         self.posterior = Some(self.post_approx.apply(
             &f_prior,
             &self.m.data,
@@ -634,12 +632,12 @@ mod tests {
     #[test]
     fn manual_optimization() -> Result<()> {
         let mut opt = PreferenceOpt::new(3).with_same_bounds((0.0, 10.0))?;
-        let (_, idx1, _, idx2, f_prior) = opt.get_next_sample(None, 500, 1)?;
-        opt.add_preference(idx1, idx2);
-        let (_, idx1, _, idx2, f_prior) = opt.get_next_sample(f_prior.as_ref(), 500, 1)?;
-        opt.add_preference(idx1, idx2);
-        let (_, idx1, _, idx2, _) = opt.get_next_sample(f_prior.as_ref(), 500, 1)?;
-        opt.add_preference(idx1, idx2);
+        let mut prior = None;
+        for _ in 0..15 {
+            let (_, idx1, _, idx2, f_prior) = opt.get_next_sample(prior.as_ref(), 1, 1)?;
+            opt.add_preference(idx1, idx2);
+            prior = f_prior;
+        }
         opt.x.show();
         opt.m.show();
         println!("{:?}", opt.get_optimal_values());

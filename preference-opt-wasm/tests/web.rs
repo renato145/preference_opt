@@ -15,9 +15,12 @@ fn get_engine() {
 
 #[wasm_bindgen_test]
 fn optimization() {
-    let mut opt = OptimizationEngine::new_empty(2).with_same_bounds(vec![0.0, 10.0]);
-    let sample = opt.get_next_sample(500, 1, None);
-    opt.add_preference(1, 0);
-    let _sample = opt.get_next_sample(500, 1, sample.f_prior());
+    let mut opt = OptimizationEngine::new_empty(3).with_same_bounds(vec![0.0, 255.0]);
+    let mut prior = None;
+    for _ in 0..15 {
+        let sample = opt.get_next_sample(1, 1, prior.clone());
+        opt.add_preference(1, 0);
+        prior = sample.f_prior();
+    }
     println!("Optimal: {:?}", opt.get_optimal_values());
 }
