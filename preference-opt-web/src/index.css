@@ -10,9 +10,17 @@
   a {
     @apply text-blue-600 hover:text-blue-800 transition;
   }
+
+  button {
+    @apply disabled:opacity-50;
+  }
 }
 
 @layer components {
+  .btn {
+    @apply bg-gray-500 hover:bg-gray-600 active:bg-gray-800 px-2 py-1 rounded text-white transition focus:outline-none focus:ring;
+  }
+
   .btn-confirm {
     @apply bg-blue-500 hover:bg-blue-600 active:bg-blue-800 px-2 py-1 rounded text-white transition focus:outline-none focus:ring;
   }
@@ -26,7 +34,7 @@
   }
 
   .btn-sm {
-    @apply px-1 py-1 text-xs;
+    @apply px-2 py-1 text-xs;
   }
 
   .input-text {
