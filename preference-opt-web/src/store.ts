@@ -10,19 +10,21 @@ export enum OptimizationState {
 export type TStore = {
   engine: OptimizationEngine;
   optState: OptimizationState;
-  sampleData: SampleData | undefined;
-  bestSample: Float64Array | undefined;
+  sampleData?: SampleData;
+  bestSample?: Float64Array;
+  savedSamples: Float64Array[];
   loadSampleData: () => void;
   selectSample: (idx: number) => void;
+  saveCurrentBest: () => void;
 };
 
+const newEngine = () =>
+  OptimizationEngine.new_empty(3).with_same_bounds(new Float64Array([0, 1]));
+
 export const useStore = create<TStore>((set, get) => ({
-  engine: OptimizationEngine.new_empty(3).with_same_bounds(
-    new Float64Array([0, 1])
-  ),
+  engine: newEngine(),
   optState: OptimizationState.Initial,
-  sampleData: undefined,
-  bestSample: undefined,
+  savedSamples: [],
   loadSampleData: () => {
     const sampleData = get().engine.get_next_sample(
       500,
@@ -42,6 +44,16 @@ export const useStore = create<TStore>((set, get) => ({
     get().engine.add_preference(idx, other);
     const bestSample = get().engine.get_optimal_values();
     set({ bestSample });
+    get().loadSampleData();
+  },
+  saveCurrentBest: () => {
+    let bestSample = get().bestSample;
+    if (bestSample === undefined) return;
+    get().savedSamples.push(bestSample);
+    set({
+      engine: newEngine(),
+      bestSample: undefined,
+    });
     get().loadSampleData();
   },
 }));
