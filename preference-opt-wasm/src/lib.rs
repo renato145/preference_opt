@@ -121,7 +121,7 @@ mod tests {
         opt.engine.m.show();
         let sample = opt.get_next_sample(None, 500, 1);
         opt.add_preference(1, 0);
-        let _sample = opt.get_next_sample(sample.f_prior, 500, 1);
+        let _sample = opt.get_next_sample(sample.f_prior(), 500, 1);
         opt.engine.x.show();
         opt.engine.m.show();
         println!("Optimal: {:?}", opt.get_optimal_values());
