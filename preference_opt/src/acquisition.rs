@@ -29,7 +29,7 @@ impl ExpectedImprovement {
         let z = y.component_div(&std);
         let cdf = DVector::from_iterator(n, z.iter().map(|&o| distribution.cdf(o)));
         let pdf = DVector::from_iterator(n, z.iter().map(|&o| distribution.pdf(o)));
-        y.component_mul(&cdf) + std.component_mul(&pdf)
+        (y.component_mul(&cdf)) + (std.component_mul(&pdf))
     }
 }
 
