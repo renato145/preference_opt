@@ -53,7 +53,7 @@ impl OptimizationEngine {
     ) -> SampleData {
         let (sample1, idx1, sample2, idx2, f_prior) = self
             .engine
-            .get_next_sample(f_prior.as_ref(), n_init, n_solve)
+            .get_next_sample(f_prior.clone(), n_init, n_solve)
             .unwrap();
         SampleData {
             sample1,

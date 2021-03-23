@@ -217,7 +217,7 @@ impl PreferenceOpt {
     /// * `n_solve` - The solver will be run n_solve times (cannot be superior to n_init)
     pub fn get_next_sample(
         &mut self,
-        f_prior: Option<&Vec<f64>>,
+        f_prior: Option<Vec<f64>>,
         n_init: usize,
         n_solve: usize,
     ) -> Result<(Vec<f64>, usize, Vec<f64>, usize, Option<Vec<f64>>)> {
@@ -634,7 +634,7 @@ mod tests {
         let mut opt = PreferenceOpt::new(3).with_same_bounds((0.0, 10.0))?;
         let mut prior = None;
         for _ in 0..15 {
-            let (_, idx1, _, idx2, f_prior) = opt.get_next_sample(prior.as_ref(), 1, 1)?;
+            let (_, idx1, _, idx2, f_prior) = opt.get_next_sample(prior, 1, 1)?;
             opt.add_preference(idx1, idx2);
             prior = f_prior;
         }

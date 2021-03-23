@@ -31,11 +31,9 @@ export const useStore = create<TStore>((set, get) => ({
   savedSamples: [],
   loadSampleData: () => {
     set(({ step, engine, sampleData }) => {
-      // TODO: There is an error when doing many steps
-      const prior = step < 12 ? sampleData?.f_prior() : undefined;
       return {
         step: step + 1,
-        sampleData: engine.get_next_sample(50, 1, prior),
+        sampleData: engine.get_next_sample(100, 1, sampleData?.f_prior()),
       };
     });
   },

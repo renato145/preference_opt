@@ -118,9 +118,11 @@ impl Laplace {
         let mut i = 0;
         while (i < self.max_iter) & (eps > self.tol) {
             let (g, h) = delta(&f, m);
-            let f_new = &f - self.eta * h.cholesky().unwrap().solve(&g);
-            eps = (&f_new - f).norm();
-            f = f_new;
+            if let Some(cholesky) = h.cholesky() {
+                let f_new = &f - self.eta * cholesky.solve(&g);
+                eps = (&f_new - f).norm();
+                f = f_new;
+            };
             i += 1;
         }
         f
